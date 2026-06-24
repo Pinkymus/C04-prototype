@@ -4,6 +4,8 @@ import random
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
 
 app = FastAPI(title="ALK Metadata + RAG Readiness Prototype")
@@ -457,7 +459,165 @@ def search(
         "results": results,
     }
 
+def rag_query_documents(query: RAGQuery):
+    """
+    Simplified RAG-style retrieval.
 
+    This simulates the retrieval part of RAG:
+    - checks access rights
+    - collects accessible document chunks
+    - vectorizes chunks and prompt using TF-IDF
+    - compares prompt vector against chunk vectors using cosine similarity
+    - returns source documents and matching chunks
+
+    In a real implementation, TF-IDF would be replaced by embeddings
+    and a vector database.
+    """
+    accessible_chunks = []
+
+    for document in DOCUMENTS.values():
+        if not user_can_access(document, query.user_security_clearance):
+            continue
+
+        tokenization_id = document["current_tokenization_id"]
+
+        chunks = [
+            chunk for chunk in DOCUMENT_CHUNKS.values()
+            if chunk["tokenization_id"] == tokenization_id
+        ]
+
+        for chunk in chunks:
+            accessible_chunks.append({
+                "document": document,
+                "chunk": chunk,
+                "text": chunk["chunk_text"],
+            })
+
+    if not accessible_chunks:
+        return {
+            "prompt": query.prompt,
+            "user_name": query.user_name,
+            "user_security_clearance": query.user_security_clearance,
+            "answer": "No accessible documents have been ingested yet.",
+            "results": [],
+            "retrieval_steps": [
+                "Received prompt",
+                "Checked user access level",
+                "No accessible chunks found",
+            ],
+        }
+
+    corpus = [item["text"] for item in accessible_chunks]
+    corpus.append(query.prompt)
+
+    vectorizer = TfidfVectorizer(stop_words="english")
+    vectors = vectorizer.fit_transform(corpus)
+
+    chunk_vectors = vectors[:-1]
+    query_vector = vectors[-1]
+
+    similarities = cosine_similarity(query_vector, chunk_vectors).flatten()
+
+    ranked = sorted(
+        zip(accessible_chunks, similarities),
+        key=lambda pair: pair[1],
+        reverse=True,
+    )
+
+    document_results = {}
+
+    for item, similarity in ranked:
+        if similarity <= 0:
+            continue
+
+        document = item["document"]
+        chunk = item["chunk"]
+        document_id = document["document_id"]
+
+        if document_id not in document_results:
+            document_results[document_id] = {
+                "document_id": document["document_id"],
+                "title": document["title"],
+                "file_uri": document["file_uri"],
+                "file_type_id": document["file_type_id"],
+                "security_level_id": document["security_level_id"],
+                "department_id": document["department_id"],
+                "source_system_id": document["source_system_id"],
+                "validation_status_id": document["validation_status_id"],
+                "owner": document["owner"],
+                "current_tokenization_id": document["current_tokenization_id"],
+                "matching_chunks": [],
+                "score": 0,
+                "fake_relevance_score": 0,
+            }
+
+        document_results[document_id]["matching_chunks"].append({
+            **chunk,
+            "similarity": round(float(similarity), 4),
+        })
+
+        document_results[document_id]["score"] += float(similarity)
+
+    results = list(document_results.values())
+
+    results.sort(
+        key=lambda item: item["score"],
+        reverse=True,
+    )
+
+    results = results[:query.max_results]
+
+    for result in results:
+        result["matching_chunks"] = result["matching_chunks"][:2]
+        result["fake_relevance_score"] = min(
+            98,
+            max(60, round(result["score"] * 100)),
+        )
+
+    if not results:
+        return {
+            "prompt": query.prompt,
+            "user_name": query.user_name,
+            "user_security_clearance": query.user_security_clearance,
+            "answer": (
+                "No accessible documents matched the query. "
+                "The relevant documents may not have been ingested yet, "
+                "or the user may not have access."
+            ),
+            "results": [],
+            "retrieval_steps": [
+                "Received prompt",
+                "Checked user access level",
+                "Vectorized prompt using TF-IDF",
+                "Compared prompt against document chunks",
+                "No matching accessible chunks found",
+            ],
+        }
+
+    cited_titles = ", ".join(result["title"] for result in results)
+
+    return {
+        "prompt": query.prompt,
+        "user_name": query.user_name,
+        "user_security_clearance": query.user_security_clearance,
+        "answer": (
+            f"Based on the accessible RAG Compass records, the most relevant source documents are: "
+            f"{cited_titles}. The prototype retrieved these by comparing the prompt against tokenized "
+            f"document chunks and returning the closest matches with source references."
+        ),
+        "results": results,
+        "retrieval_steps": [
+            "Received prompt",
+            "Checked user access level",
+            "Vectorized prompt using TF-IDF",
+            "Compared prompt against tokenized document chunks",
+            "Returned accessible documents with source references",
+        ],
+    }
+
+@app.post("/rag-compass/query")
+def rag_compass_query(query: RAGQuery):
+    return rag_query_documents(query)
 
 # ---------------------------------------------------------------------
 # Register mock external systems
