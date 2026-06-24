@@ -8,7 +8,27 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
 
-app = FastAPI(title="ALK Metadata + RAG Readiness Prototype")
+app = FastAPI(
+    title="ALK Metadata + RAG Readiness Prototype",
+    openapi_tags=[
+        {
+            "name": "Prototype: Traditional Search",
+            "description": "Human-readable metadata and keyword search across document records and chunks.",
+        },
+        {
+            "name": "Prototype: RAG Retrieval",
+            "description": "Simplified RAG-style retrieval using TF-IDF vectors and cosine similarity.",
+        },
+        {
+            "name": "Prototype: Core",
+            "description": "Core metadata layer, document records, tokenization, chunks, and database-style tables.",
+        },
+        {
+            "name": "Mocks",
+            "description": "Mocked company portals and services",
+        }
+    ],
+)
 
 
 # ---------------------------------------------------------------------
@@ -240,6 +260,110 @@ def create_document_record(document: DocumentIntake):
         "tokenization_record": TOKENIZED_DOCUMENTS[tokenization_id],
     }
 
+def seed_demo_data():
+    """
+    Creates a small set of demo documents in memory.
+
+    This makes the prototype easier to demo after every restart.
+    The seed data uses the same intake pipeline as uploaded files.
+    """
+    if DOCUMENTS:
+        return
+
+    demo_documents = [
+        DocumentIntake(
+            title="Pediatric AIT Study Overview",
+            file_uri="/seed-data/pediatric-ait-study-overview.txt",
+            file_type_id="FT_TXT",
+            security_level_id="SEC02",
+            department_id="DEP_CLIN",
+            source_system_id="SRC_SP01",
+            validation_status_id="VAL_OK",
+            owner="Sarah Green",
+            text_content=(
+                "This study overview describes pediatric allergen immunotherapy research. "
+                "The study focuses on children and adolescents, treatment adherence, symptom reduction, "
+                "long-term outcomes, and safety monitoring during allergy treatment. "
+                "The work includes observations from previous clinical development projects and may be reused "
+                "when designing future pediatric AIT studies."
+            ),
+            extra_metadata={
+                "project": "Pediatric AIT",
+                "seeded": True,
+                "document_category": "Study overview",
+            },
+        ),
+        DocumentIntake(
+            title="ALK-depot Clinical Study Safety Report",
+            file_uri="/seed-data/alk-depot-clinical-study-safety-report.txt",
+            file_type_id="FT_TXT",
+            security_level_id="SEC02",
+            department_id="DEP_CLIN",
+            source_system_id="SRC_SP01",
+            validation_status_id="VAL_OK",
+            owner="Sarah Green",
+            text_content=(
+                "This clinical study report describes ALK-depot Phase III safety results. "
+                "The study followed patients receiving subcutaneous immunotherapy and monitored adverse events, "
+                "dose escalation, injection site reactions, and patient compliance. "
+                "The results showed acceptable safety and no unexpected safety signals."
+            ),
+            extra_metadata={
+                "project": "ALK-depot",
+                "seeded": True,
+                "document_category": "Clinical Study Report",
+            },
+        ),
+        DocumentIntake(
+            title="EMA Regulatory Submission Summary",
+            file_uri="/seed-data/ema-regulatory-submission-summary.txt",
+            file_type_id="FT_TXT",
+            security_level_id="SEC03",
+            department_id="DEP_REG",
+            source_system_id="SRC_SP01",
+            validation_status_id="VAL_OK",
+            owner="Nina Andersen",
+            text_content=(
+                "This regulatory submission summary describes the EMA documentation package for ALK-depot. "
+                "It includes clinical efficacy, safety analysis, product quality documentation, risk management, "
+                "and responses to regulatory questions from the authority."
+            ),
+            extra_metadata={
+                "project": "ALK-depot",
+                "seeded": True,
+                "document_category": "Regulatory submission",
+            },
+        ),
+        DocumentIntake(
+            title="ALK-depot Dose Escalation Protocol",
+            file_uri="/seed-data/alk-depot-dose-escalation-protocol.txt",
+            file_type_id="FT_TXT",
+            security_level_id="SEC02",
+            department_id="DEP_RND",
+            source_system_id="SRC_TEAMS01",
+            validation_status_id="VAL_PENDING",
+            owner="Martin Nielsen",
+            text_content=(
+                "This protocol describes the dose escalation schedule for ALK-depot subcutaneous immunotherapy. "
+                "Patients begin at a low dose and gradually increase over several weeks. "
+                "The protocol includes monitoring requirements, stopping rules, and criteria for continuing treatment."
+            ),
+            extra_metadata={
+                "project": "ALK-depot",
+                "seeded": True,
+                "document_category": "Protocol",
+            },
+        ),
+    ]
+
+    for document in demo_documents:
+        create_document_record(document)
+
+@app.on_event("startup")
+def startup_event():
+    seed_demo_data()
+
+
 def enrich_document_for_display(document: dict) -> dict:
     return {
         **document,
@@ -268,7 +392,7 @@ def enrich_document_for_display(document: dict) -> dict:
 # Core API routes
 # ---------------------------------------------------------------------
 
-@app.get("/")
+@app.get("/", tags=["Prototype: Core"])
 def root():
     return {
         "message": "ALK RAG Compass prototype is running.",
@@ -281,17 +405,17 @@ def root():
     }
 
 
-@app.post("/documents/intake")
+@app.post("/documents/intake", tags=["Prototype: Core"])
 def intake_document(document: DocumentIntake):
     return create_document_record(document)
 
 
-@app.get("/documents")
+@app.get("/documents", tags=["Prototype: Core"])
 def get_documents():
     return list(DOCUMENTS.values())
 
 
-@app.get("/documents/{document_id}")
+@app.get("/documents/{document_id}", tags=["Prototype: Core"])
 def get_document(document_id: str):
     if document_id not in DOCUMENTS:
         raise HTTPException(status_code=404, detail="Document not found.")
@@ -299,7 +423,7 @@ def get_document(document_id: str):
     return DOCUMENTS[document_id]
 
 
-@app.get("/documents/{document_id}/tokenization")
+@app.get("/documents/{document_id}/tokenization", tags=["Prototype: Core"])
 def get_tokenization(document_id: str):
     document = DOCUMENTS.get(document_id)
 
@@ -328,7 +452,7 @@ def get_tokenization(document_id: str):
     }
 
 
-@app.get("/tables")
+@app.get("/tables", tags=["Prototype: Core"])
 def get_all_tables():
     return {
         "DOCUMENTS": list(DOCUMENTS.values()),
@@ -431,7 +555,7 @@ def search_documents(
 
     return results
 
-@app.get("/search")
+@app.get("/search", tags=["Prototype: Traditional Search"])
 def search(
     q: str = "",
     author: str = "",
@@ -615,7 +739,7 @@ def rag_query_documents(query: RAGQuery):
         ],
     }
 
-@app.post("/rag-compass/query")
+@app.post("/rag-compass/query", tags=["Prototype: RAG Retrieval"])
 def rag_compass_query(query: RAGQuery):
     return rag_query_documents(query)
 
@@ -628,3 +752,4 @@ def rag_compass_query(query: RAGQuery):
 import fake_sharepoint  # noqa: E402,F401
 import fake_internal_ai  # noqa: E402,F401
 import fake_regulatory_checklist  # noqa: E402,F401
+import fake_reuse_checker  # noqa: E402,F401

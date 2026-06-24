@@ -104,7 +104,7 @@ def find_best_document_for_requirement(requirement: dict, project: str):
         "fake_relevance_score": best_match["fake_relevance_score"],
     }
 
-@app.get("/regulatory/checklist")
+@app.get("/regulatory/checklist", tags=["Mocks"])
 def regulatory_checklist(project: str = "ALK-depot"):
     checklist_items = []
 
@@ -151,7 +151,7 @@ def regulatory_checklist(project: str = "ALK-depot"):
     }
 
 
-@app.get("/regulatory-checklist", response_class=HTMLResponse)
+@app.get("/regulatory-checklist", response_class=HTMLResponse, tags=["Mocks"])
 def regulatory_checklist_page():
     return HTMLResponse(
         """

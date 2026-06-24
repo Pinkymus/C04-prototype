@@ -3,7 +3,7 @@ from fastapi.responses import HTMLResponse
 from prototype import app
 
 
-@app.get("/ai", response_class=HTMLResponse)
+@app.get("/ai", response_class=HTMLResponse, tags=["Mocks"])
 def fake_internal_ai_page():
     return HTMLResponse(
         """

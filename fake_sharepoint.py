@@ -12,7 +12,7 @@ from prototype import (
 )
 
 
-@app.get("/sharepoint", response_class=HTMLResponse)
+@app.get("/sharepoint", response_class=HTMLResponse, tags=["Mocks"])
 def fake_sharepoint_page():
     return HTMLResponse(
         """
@@ -361,7 +361,7 @@ def fake_sharepoint_page():
     )
 
 
-@app.post("/mock-sharepoint/upload")
+@app.post("/mock-sharepoint/upload", tags=["Mocks"])
 async def mock_sharepoint_upload(
     file: UploadFile = File(...),
     department_id: str = Form("DEP_CLIN"),
