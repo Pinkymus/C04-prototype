@@ -42,6 +42,44 @@ SECURITY_RANK = {
     "SEC04": 4,  # Highly restricted
 }
 
+FILE_TYPE_LABELS = {
+    "FT_PDF": "PDF Document",
+    "FT_DOCX": "Word Document",
+    "FT_XLSX": "Excel Spreadsheet",
+    "FT_PPTX": "PowerPoint Presentation",
+    "FT_TXT": "Text Document",
+    "FT_CSV": "CSV Dataset",
+    "FT_JSON": "JSON File",
+    "FT_UNKNOWN": "Unknown File Type",
+}
+
+SECURITY_LEVEL_LABELS = {
+    "SEC01": "Public",
+    "SEC02": "Internal",
+    "SEC03": "Restricted",
+    "SEC04": "Highly Restricted",
+}
+
+DEPARTMENT_LABELS = {
+    "DEP_CLIN": "Clinical Development",
+    "DEP_REG": "Regulatory Affairs",
+    "DEP_SAFETY": "Safety",
+    "DEP_RND": "Research and Development",
+}
+
+SOURCE_SYSTEM_LABELS = {
+    "SRC_SP01": "SharePoint",
+    "SRC_OD01": "OneDrive",
+    "SRC_TEAMS01": "Microsoft Teams",
+    "SRC_MANUAL": "Manual Upload",
+}
+
+VALIDATION_STATUS_LABELS = {
+    "VAL_OK": "Validated",
+    "VAL_PENDING": "Pending Validation",
+    "VAL_FAILED": "Validation Failed",
+}
+
 
 # ---------------------------------------------------------------------
 # Request models
@@ -200,7 +238,30 @@ def create_document_record(document: DocumentIntake):
         "tokenization_record": TOKENIZED_DOCUMENTS[tokenization_id],
     }
 
-
+def enrich_document_for_display(document: dict) -> dict:
+    return {
+        **document,
+        "file_type_label": FILE_TYPE_LABELS.get(
+            document.get("file_type_id"),
+            document.get("file_type_id", "Unknown"),
+        ),
+        "security_level_label": SECURITY_LEVEL_LABELS.get(
+            document.get("security_level_id"),
+            document.get("security_level_id", "Unknown"),
+        ),
+        "department_label": DEPARTMENT_LABELS.get(
+            document.get("department_id"),
+            document.get("department_id", "Unknown"),
+        ),
+        "source_system_label": SOURCE_SYSTEM_LABELS.get(
+            document.get("source_system_id"),
+            document.get("source_system_id", "Unknown"),
+        ),
+        "validation_status_label": VALIDATION_STATUS_LABELS.get(
+            document.get("validation_status_id"),
+            document.get("validation_status_id", "Unknown"),
+        ),
+    }
 # ---------------------------------------------------------------------
 # Core API routes
 # ---------------------------------------------------------------------
@@ -275,20 +336,14 @@ def get_all_tables():
     }
 
 
-@app.get("/search")
-def search(
+
+def search_documents(
     q: str = "",
     author: str = "",
     department_id: str = "",
     security_level_id: str = "",
     source_system_id: str = "",
 ):
-    """
-    Simple metadata + keyword search.
-
-    This is separate from the RAG-like retrieval in fake_internal_ai.py.
-    It is useful for showing classic metadata filtering.
-    """
     query = q.lower().strip()
     author_query = author.lower().strip()
     department_query = department_id.lower().strip()
@@ -316,6 +371,7 @@ def search(
             str(document.get("validation_status_id", "")),
             str(document.get("owner", "")),
             str(document.get("extra_metadata", "")),
+            " ".join(chunk["chunk_text"] for chunk in chunks),
         ]).lower()
 
         matching_chunks = [
@@ -364,11 +420,30 @@ def search(
                 "security_level_id": document["security_level_id"],
                 "department_id": document["department_id"],
                 "source_system_id": document["source_system_id"],
+                "validation_status_id": document["validation_status_id"],
                 "owner": document["owner"],
                 "current_tokenization_id": document["current_tokenization_id"],
                 "matching_chunks": matching_chunks[:3],
                 "fake_relevance_score": f"{random.randint(82, 97)}%",
             })
+
+    return results
+
+@app.get("/search")
+def search(
+    q: str = "",
+    author: str = "",
+    department_id: str = "",
+    security_level_id: str = "",
+    source_system_id: str = "",
+):
+    results = search_documents(
+        q=q,
+        author=author,
+        department_id=department_id,
+        security_level_id=security_level_id,
+        source_system_id=source_system_id,
+    )
 
     return {
         "query": q,
@@ -383,6 +458,7 @@ def search(
     }
 
 
+
 # ---------------------------------------------------------------------
 # Register mock external systems
 # ---------------------------------------------------------------------
@@ -391,3 +467,4 @@ def search(
 
 import fake_sharepoint  # noqa: E402,F401
 import fake_internal_ai  # noqa: E402,F401
+import fake_regulatory_checklist  # noqa: E402,F401
