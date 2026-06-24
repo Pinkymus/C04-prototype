@@ -553,7 +553,7 @@ def reuse_checker_page():
                             </div>
 
                             <div class="pipe-step">
-                                <div class="pipe-title">2. Baby RAG retrieval</div>
+                                <div class="pipe-title">2. RAG retrieval</div>
                                 <div class="pipe-body">
                                     ${escapeHtml(data.rag_retrieval.retrieval_steps.join(" → "))}
                                 </div>

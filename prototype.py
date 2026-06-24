@@ -691,11 +691,29 @@ def rag_query_documents(query: RAGQuery):
 
     results = results[:query.max_results]
 
-    for result in results:
+    # for result in results:
+    #     result["matching_chunks"] = result["matching_chunks"][:2]
+    #     result["fake_relevance_score"] = min(
+    #         98,
+    #         max(60, round(result["score"] * 100)),
+    #     )
+
+    for rank, result in enumerate(results):
         result["matching_chunks"] = result["matching_chunks"][:2]
+
+        raw_score = float(result["score"])
+
+        # Demo-friendly score.
+        # TF-IDF cosine scores are often small, so this maps them into a clearer
+        # presentation range without claiming to be a real model confidence score.
+        scaled_score = 62 + round(raw_score * 180)
+
+        # Small rank adjustment so the best result looks clearly best.
+        scaled_score -= rank * 6
+
         result["fake_relevance_score"] = min(
             98,
-            max(60, round(result["score"] * 100)),
+            max(60, scaled_score),
         )
 
     if not results:
