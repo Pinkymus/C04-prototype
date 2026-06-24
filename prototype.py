@@ -9,7 +9,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 
 app = FastAPI(
-    title="ALK Metadata + RAG Readiness Prototype",
+    title="RAG Compass",
     openapi_tags=[
         {
             "name": "Prototype: Traditional Search",
