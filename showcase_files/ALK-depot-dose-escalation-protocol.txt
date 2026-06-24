@@ -1,0 +1,1 @@
+This protocol describes the dose escalation schedule for ALK-depot subcutaneous immunotherapy. Patients begin at a low dose and gradually increase over several weeks. The protocol includes monitoring requirements, stopping rules, and criteria for continuing treatment.
